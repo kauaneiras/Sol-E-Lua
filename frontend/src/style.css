@@ -1,5 +1,5 @@
 /* ==========================================================================
-   style.css: todo o visual do Sudoku.
+   style.css: todo o visual do Sol e Lua.
 
    COMO ESTE ARQUIVO ESTÁ ORGANIZADO
    ---------------------------------
@@ -18,7 +18,7 @@
    mas o código Elm fica cheio de detalhes visuais e difícil de ler.
 
    Aqui fazemos o contrário: o Elm usa nomes que dizem O QUE o elemento é
-   (`board`, `cell`, `number-key`), e este arquivo diz COMO ele aparece.
+   (`board`, `cell`, `sign`), e este arquivo diz COMO ele aparece.
    Para não perder as vantagens do Tailwind, usamos `@apply`, que copia o
    CSS de classes utilitárias para dentro de uma classe nossa:
 
@@ -36,7 +36,7 @@
    Usamos uma versão simplificada do BEM (Bloco, Elemento, Modificador):
 
        .cell             bloco: uma casa do tabuleiro
-       .cell--selected   modificador: uma VARIAÇÃO do bloco (dois hífens)
+       .cell--conflict   modificador: uma VARIAÇÃO do bloco (dois hífens)
        .app-header       elemento/parte de um bloco maior (um hífen)
 
    O Elm liga e desliga modificadores com `classList`.
@@ -101,9 +101,7 @@
    estiver em modo escuro, e depois lembra a escolha do jogador.
 
    Os nomes `light` e `dark` são os dos temas embutidos do daisyUI. Usando o
-   mesmo nome, PERSONALIZAMOS esses temas em vez de criar temas novos. Assim o
-   Elm funciona igual com este arquivo e com o style-simples.css, que usa os
-   temas originais.
+   mesmo nome, PERSONALIZAMOS esses temas em vez de criar temas novos.
 
    As cores estão em OKLCH: oklch(luminosidade croma matiz).
      - luminosidade: 0% (preto) a 100% (branco)
@@ -224,15 +222,13 @@
 
 :root {
   /* --- Tipografia --- */
-  --font-title: var(--font-display);  /* título "Sudoku" */
-  /* Todos os números usam UMA fonte geométrica. A origem de cada número
-     (pista, jogador, Prolog) é indicada só por peso, cor e fundo. Fontes
-     variáveis aceitam qualquer peso de 100 a 900, não só 400 e 700. */
+  --font-title: var(--font-display);  /* título "Sol e Lua" */
+  /* A origem de cada símbolo (pista, jogador, Prolog) é indicada por peso,
+     cor e fundo. */
   --font-numbers: var(--font-sans);
   --given-weight: 700;     /* pistas: firmes */
   --guess-weight: 400;     /* jogador: mais leve */
   --revealed-weight: 300;  /* Prolog: fino */
-  --marks-weight: 500;
 
   /* --- Layout --- */
   --panel-width: 18rem;  /* painel lateral (telas largas) */
@@ -257,17 +253,13 @@
   /* --- Cores de estado das casas --- */
   --cell-bg: transparent;
   --cell-hover: color-mix(in oklch, var(--color-primary) 10%, transparent);
-  --cell-related: color-mix(in oklch, var(--color-primary) 7%, transparent);
-  --cell-same-value: color-mix(in oklch, var(--color-accent) 35%, transparent);
-  --cell-selected: var(--color-primary);
   --cell-conflict: var(--color-error);
   --given-color: var(--color-base-content);
   --guess-color: var(--color-info);
   --revealed-color: var(--color-success);
 
-  /* Fundo que indica a origem do número. Fica numa camada própria
-     (background-image), por cima da cor de estado (background-color), e por
-     isso convive com os destaques de linha, coluna e mesmo número. */
+  /* Fundo que indica a origem do símbolo. Fica numa camada própria
+     (background-image), por cima da cor de estado (background-color). */
   --given-tint: color-mix(in oklch, var(--color-base-content) 7%, transparent);
   --guess-tint: color-mix(in oklch, var(--color-info) 11%, transparent);
   --revealed-tint: color-mix(in oklch, var(--color-success) 11%, transparent);
@@ -406,10 +398,6 @@
     color: transparent;
   }
 
-  .app-subtitle {
-    @apply badge badge-soft badge-primary font-medium;
-  }
-
   /* Botão sol/lua. `swap` (daisyUI) mostra `.swap-off` com o checkbox
      desmarcado e `.swap-on` com ele marcado; `swap-rotate` gira na troca.
      `ms-auto` (margin-inline-start: auto) empurra o botão para a direita. */
@@ -423,10 +411,6 @@
 
   .app-footer {
     @apply px-4 pb-6 text-center text-sm opacity-60;
-
-    & kbd {
-      @apply kbd kbd-sm;
-    }
   }
 
   /* ---------- Layout do jogo ----------
@@ -498,12 +482,12 @@
      tamanho dos números acompanha o tabuleiro, qualquer que seja a tela
      (veja `.cell`, abaixo).
 
-     `grid-rows-9` é tão necessário quanto `grid-cols-9`: sem ele, a altura
+     `grid-rows-6` é tão necessário quanto `grid-cols-6`: sem ele, a altura
      de cada linha depende do conteúdo, e uma linha vazia fica mais baixa que
-     uma linha com números. Com os dois, as 81 casas têm o mesmo tamanho. */
+     uma linha com símbolos. Com os dois, as 36 casas têm o mesmo tamanho. */
 
   .board {
-    @apply relative grid grid-cols-9 grid-rows-9 overflow-hidden;
+    @apply relative grid grid-cols-6 grid-rows-6 overflow-hidden;
     width: var(--board-size);
     aspect-ratio: 1;
     container-type: inline-size;
@@ -542,9 +526,9 @@
 
   .cell {
     @apply relative flex items-center justify-center select-none;
-    /* 100cqi = largura do tabuleiro; / 9 = largura de uma casa. */
+    /* 100cqi = largura do tabuleiro; / 6 = largura de uma casa. */
     font-family: var(--font-numbers);
-    font-size: calc(100cqi / 9 * 0.52);
+    font-size: calc(100cqi / 6 * 0.55);
     font-variant-numeric: tabular-nums;
     line-height: 1;
     /* Duas camadas de fundo: a cor de estado (seleção, destaques) e, por
@@ -558,21 +542,11 @@
     transition: background-color calc(120ms * var(--speed)), color calc(120ms * var(--speed));
     cursor: pointer;
 
-    /* Linhas grossas dos blocos 3x3, calculadas só com CSS.
-       As 81 casas são filhas do tabuleiro, em ordem de leitura.
-       `:nth-child(9n + 3)` = 3ª, 12ª, 21ª... casa = coluna 3 de cada linha. */
-    &:nth-child(9n + 3),
-    &:nth-child(9n + 6) {
-      border-right: var(--board-line-thick) solid var(--board-box-color);
-    }
-    /* `:nth-child(n + 19):nth-child(-n + 27)` = da 19ª à 27ª casa = linha 3. */
-    &:nth-child(n + 19):nth-child(-n + 27),
-    &:nth-child(n + 46):nth-child(-n + 54) {
-      border-bottom: var(--board-line-thick) solid var(--board-box-color);
-    }
-    /* Última coluna e última linha não precisam de borda (o tabuleiro já tem). */
-    &:nth-child(9n)       { border-right: none; }
-    &:nth-child(n + 73)   { border-bottom: none; }
+    /* As 36 casas são filhas do tabuleiro, em ordem de leitura.
+       Última coluna (6ª, 12ª, ...) e última linha (31ª em diante) não
+       precisam de borda: o tabuleiro já tem. */
+    &:nth-child(6n)       { border-right: none; }
+    &:nth-child(n + 31)   { border-bottom: none; }
 
     &:hover {
       background-color: var(--cell-hover);
@@ -584,11 +558,6 @@
     }
   }
 
-  /* Modificadores de destaque. A ORDEM importa: com a mesma especificidade,
-     a regra que vem depois vence. Por isso "selecionada" vem por último. */
-  .cell--related    { --cell-bg: var(--cell-related); }
-  .cell--same-value { --cell-bg: var(--cell-same-value); }
-
   /* Conflito: listras diagonais feitas com `repeating-linear-gradient`. */
   .cell--conflict {
     color: var(--cell-conflict);
@@ -599,34 +568,14 @@
     );
   }
 
-  .cell--selected {
-    --cell-bg: var(--cell-selected);
-    color: var(--color-primary-content);
-    box-shadow: inset 0 0 0 2px color-mix(in oklch, var(--color-primary-content) 35%, transparent);
-
-    &:hover { background-color: var(--cell-bg); }
-
-    /* Na casa selecionada, o tingido de origem sairia "sujo" sobre a cor
-       forte da seleção. Então o desligamos. */
-    &, &.cell--conflict { background-image: none; }
-
-    &.cell--conflict {
-      background-color: var(--cell-conflict);
-      color: var(--color-error-content);
-    }
-  }
-
-  /* Tipos de número */
-
-  /* Os três tipos de número só mudam variáveis: peso, cor e tingido.
-     `:not(A, B)` exclui as casas selecionadas ou em conflito, que têm cores
-     próprias definidas acima. */
+  /* Os três tipos de casa só mudam variáveis: peso, cor e tingido.
+     `:not(...)` exclui as casas em conflito, que têm cor própria. */
 
   .cell--given {
     --cell-tint: var(--given-tint);
     font-weight: var(--given-weight);
 
-    &:not(.cell--selected, .cell--conflict) {
+    &:not(.cell--conflict) {
       color: var(--given-color);
     }
   }
@@ -635,7 +584,7 @@
     --cell-tint: var(--guess-tint);
     font-weight: var(--guess-weight);
 
-    &:not(.cell--selected, .cell--conflict) {
+    &:not(.cell--conflict) {
       color: var(--guess-color);
     }
   }
@@ -644,7 +593,7 @@
     --cell-tint: var(--revealed-tint);
     font-weight: var(--revealed-weight);
 
-    &:not(.cell--selected, .cell--conflict) {
+    &:not(.cell--conflict) {
       color: var(--revealed-color);
     }
   }
@@ -662,85 +611,43 @@
     animation: reveal calc(500ms * var(--speed)) ease-out;
   }
 
-  /* ---------- Marcações de canto ----------
-     A casa ganha uma grade 3x3 invisível. O Elm só coloca as marcações em
-     ordem crescente, e é o CSS que decide onde cada uma fica: 1ª marcação no
-     canto superior esquerdo, 2ª no superior direito, etc. `grid-area:
-     linha / coluna` posiciona um item na grade.
+  /* ---------- Símbolos ----------
+     O sol e a lua são caracteres de texto (☀ e ☾), então a cor vem de
+     `color`, como a de qualquer letra. */
 
-         1 5 2
-         7 9 8
-         3 6 4
-  */
+  .cell-symbol--sun  { color: oklch(0.75 0.17 65); }
+  .cell-symbol--moon { color: oklch(0.6 0.13 255); }
 
-  .corner-marks {
-    @apply absolute grid grid-cols-3 grid-rows-3;
-    inset: 7%;
-    font-size: calc(100cqi / 9 * 0.24);
-    font-weight: var(--marks-weight);
+  /* Na casa em conflito, o símbolo fica com a cor de erro. */
+  .cell--conflict .cell-symbol { color: var(--cell-conflict); }
+
+  /* ---------- Sinais = e × ----------
+     Os sinais ficam numa camada por cima das casas (`.signs`), que ocupa o
+     tabuleiro inteiro. O Elm calcula, em porcentagem, onde fica o ponto
+     entre as duas casas (atributos `left` e `top` no `style`), e o
+     `translate(-50%, -50%)` centraliza o sinal nesse ponto.
+     `pointer-events: none` deixa os cliques passarem para as casas. */
+
+  .signs {
+    @apply absolute inset-0;
+    pointer-events: none;
   }
 
-  .corner-mark {
-    @apply flex items-center justify-center opacity-70;
-
-    &:nth-child(1) { grid-area: 1 / 1; }
-    &:nth-child(2) { grid-area: 1 / 3; }
-    &:nth-child(3) { grid-area: 3 / 1; }
-    &:nth-child(4) { grid-area: 3 / 3; }
-    &:nth-child(5) { grid-area: 1 / 2; }
-    &:nth-child(6) { grid-area: 3 / 2; }
-    &:nth-child(7) { grid-area: 2 / 1; }
-    &:nth-child(8) { grid-area: 2 / 3; }
-    &:nth-child(9) { grid-area: 2 / 2; }
+  .sign {
+    @apply absolute flex items-center justify-center rounded-full font-bold;
+    width: calc(100cqi / 6 * 0.32);
+    height: calc(100cqi / 6 * 0.32);
+    font-size: calc(100cqi / 6 * 0.24);
+    transform: translate(-50%, -50%);
+    color: var(--color-base-content);
+    background: var(--color-base-100);
+    border: 1px solid var(--board-line-color);
   }
 
-  .corner-mark--highlight {
-    @apply font-bold opacity-100;
-    color: var(--color-accent-content);
-    background: var(--color-accent);
-    border-radius: 999px;
-  }
+  /* ---------- Regras ---------- */
 
-  /* ---------- Teclado numérico ---------- */
-
-  .number-pad {
-    @apply grid grid-cols-3 gap-2;
-  }
-
-  .number-key {
-    @apply btn btn-lg aspect-square h-auto border-0 text-2xl;
-    font-family: var(--font-numbers);
-    font-weight: 500;
-    background: color-mix(in oklch, var(--color-base-content) 6%, transparent);
-    transition: transform calc(100ms * var(--speed)), background-color calc(150ms * var(--speed));
-
-    &:hover:not(:disabled) {
-      background: color-mix(in oklch, var(--color-primary) 18%, transparent);
-    }
-    &:active:not(:disabled) {
-      transform: scale(0.94);
-    }
-  }
-
-  /* O Elm marca o modo atual com um atributo: <div class="app" data-mode="marks">.
-     Seletores de atributo `[nome="valor"]` permitem estilizar por estado
-     sem criar uma classe nova. No modo de marcação, o número do botão vai
-     para o canto, imitando uma marcação. */
-  [data-mode="marks"] .number-key {
-    @apply items-start justify-start p-2 text-base;
-    background: color-mix(in oklch, var(--color-warning) 25%, transparent);
-  }
-
-  .erase-key {
-    @apply btn btn-lg btn-ghost col-span-1 h-auto min-h-12 text-xl;
-  }
-
-  .mode-toggle {
-    @apply btn btn-lg col-span-2 h-auto min-h-12;
-
-    &.mode-toggle--on {
-      @apply btn-warning;
-    }
+  .rules {
+    @apply list-disc pl-5 text-sm opacity-80 space-y-1;
   }
 
   /* ---------- Ações ---------- */
